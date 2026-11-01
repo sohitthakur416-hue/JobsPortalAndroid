@@ -1,6 +1,6 @@
 name: Build JobsPortal APK
 
-on:
+"on":
   workflow_dispatch:
   push:
     branches:
@@ -11,11 +11,10 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java
@@ -24,17 +23,32 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
+      - name: Find and Extract ZIP
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Android project ZIP not found"
+            exit 1
+          fi
+          mkdir source
+          unzip -o "$ZIP_FILE" -d source
+
+      - name: Find Android Project
+        run: |
+          PROJECT_DIR=$(find source -name settings.gradle -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "settings.gradle not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JobsPortal-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: JobsPortal-APK
+          path: source/**/app/build/outputs/apk/debug/app-debug.apk
